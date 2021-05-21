@@ -3,8 +3,8 @@ parts/
 stage/
 prime/
 snap/.snapcraft
-android-images/
 *.snap
 CMakeLists.txt.user
 *.o
 .idea
+.vscode

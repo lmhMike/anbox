@@ -50,7 +50,7 @@ At the moment we officially support the following Linux distributions:
  * Ubuntu 20.04 (focal)
 
 However all other distributions supporting snap packages should work as
-well as long as they provide the mandatory kernel modules (see kernel/).
+well as long as they provide the mandatory kernel support (see [documentation](docs/install.md)).
 
 ## Install and Run Android Applications
 
@@ -94,7 +94,7 @@ system:
  * libsdl2
  * libprotobuf
  * protobuf-compiler
- * python2
+ * python3
  * lxc (>= 3.0)
 
 On an Ubuntu system you can install all build dependencies with the following
@@ -107,7 +107,7 @@ $ sudo apt install build-essential cmake cmake-data debhelper dbus google-mock \
     libboost-thread-dev libcap-dev libexpat1-dev libsystemd-dev libegl1-mesa-dev \
     libgles2-mesa-dev libglm-dev libgtest-dev liblxc1 \
     libproperties-cpp-dev libprotobuf-dev libsdl2-dev libsdl2-image-dev lxc-dev \
-    pkg-config protobuf-compiler python-minimal
+    pkg-config protobuf-compiler python3-minimal
 ```
 We recommend Ubuntu 20.04 (focal) as your build environment.
 
@@ -137,8 +137,8 @@ If you want to build the anbox snap instead you can do this with the following
 steps:
 
 ```
-$ mkdir android-images
-$ cp /path/to/android.img android-images/android.img
+$ ARCH=$(uname -m)
+$ cp /path/to/android.img data/android-images/android-$ARCH.img
 $ snapcraft
 ```
 
@@ -164,6 +164,7 @@ Interesting things to have a look at
  * [Runtime Setup](docs/runtime-setup.md)
  * [Build Android image](docs/build-android.md)
  * [Generate Android emugl source](docs/generate-emugl-source.md)
+ * [DBUS interface](docs/dbus.md)
 
 ## Reporting bugs
 

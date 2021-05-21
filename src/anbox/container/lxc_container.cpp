@@ -89,8 +89,7 @@ constexpr int device_minor(dev_t dev) {
 }
 } // namespace
 
-namespace anbox {
-namespace container {
+namespace anbox::container {
 LxcContainer::LxcContainer(bool privileged,
                            bool rootfs_overlay,
                            const std::string& container_network_address,
@@ -375,6 +374,9 @@ void LxcContainer::start(const Configuration &configuration) {
   const auto log_path = SystemConfiguration::instance().log_dir();
   set_config_item(lxc_config_log_file_key, utils::string_format("%s/container.log", log_path).c_str());
 
+  // set RLIMIT_NICE to 1 so binder_linux does not complain
+  set_config_item("lxc.prlimit.nice", "1");
+
 #ifndef ENABLE_LXC2_SUPPORT
     // Dump the console output to disk to have a chance to debug early boot problems
     set_config_item("lxc.console.logfile", utils::string_format("%s/console.log", log_path).c_str());
@@ -480,6 +482,20 @@ void LxcContainer::start(const Configuration &configuration) {
                                          new_default_prop_path.string(), rootfs_path));
   }
 
+  fs::path bindtab = SystemConfiguration::instance().data_dir() / "bindtab";
+  if ( fs::exists(bindtab) && fs::is_regular_file(bindtab) ) {
+    std::ifstream bindtab_data;
+    bindtab_data.open(bindtab.string(), std::ios_base::in);
+
+    if (bindtab_data.is_open()) {
+      std::string bind_mnt;
+      while (std::getline(bindtab_data, bind_mnt)) {
+        if (bind_mnt.rfind("/", 0) == 0)
+          set_config_item("lxc.mount.entry", bind_mnt);
+      }
+    }
+  }
+
   if (!container_->save_config(container_, nullptr))
     throw std::runtime_error("Failed to save container configuration");
 
@@ -513,5 +529,4 @@ void LxcContainer::set_config_item(const std::string &key,
 }
 
 Container::State LxcContainer::state() { return state_; }
-}  // namespace container
-}  // namespace anbox
+}

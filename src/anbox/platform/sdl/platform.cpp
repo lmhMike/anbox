@@ -32,9 +32,7 @@
 #include <sys/types.h>
 #pragma GCC diagnostic pop
 
-namespace anbox {
-namespace platform {
-namespace sdl {
+namespace anbox::platform::sdl {
 Platform::Platform(
     const std::shared_ptr<input::Manager> &input_manager,
     const Configuration &config)
@@ -54,13 +52,24 @@ Platform::Platform(
   SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0");
 #endif
 
-  if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS) < 0) {
+#ifdef SDL_HINT_TOUCH_MOUSE_EVENTS
+  // Don't emulate mouse events from touch, we're handling touch ourselves.
+  // Available since SDL 2.0.10
+  SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+#endif
+
+  auto sdl_init_flags = SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS;
+  if (config_.rootless)
+    sdl_init_flags = SDL_INIT_AUDIO | SDL_INIT_EVENTS;
+  if (SDL_Init(sdl_init_flags) < 0) {
     const auto message = utils::string_format("Failed to initialize SDL: %s", SDL_GetError());
     BOOST_THROW_EXCEPTION(std::runtime_error(message));
   }
 
   auto display_frame = graphics::Rect::Invalid;
   if (config_.display_frame == graphics::Rect::Invalid) {
+    // We would need to init video to fetch display info
+    if (config_.rootless) SDL_VideoInit(NULL);
     for (auto n = 0; n < SDL_GetNumVideoDisplays(); n++) {
       SDL_Rect r;
       if (SDL_GetDisplayBounds(n, &r) != 0) continue;
@@ -72,6 +81,7 @@ Platform::Platform(
       else
         display_frame.merge(frame);
     }
+    if (config_.rootless) SDL_VideoQuit();
 
     if (display_frame == graphics::Rect::Invalid)
       BOOST_THROW_EXCEPTION(
@@ -154,6 +164,8 @@ void Platform::process_events() {
     while (SDL_WaitEventTimeout(&event, 100)) {
       switch (event.type) {
         case SDL_QUIT:
+          video_has_been_closed_ = true;
+          DEBUG("SDL_QUIT");
           break;
         case SDL_WINDOWEVENT:
           for (auto &iter : windows_) {
@@ -417,6 +429,13 @@ std::shared_ptr<wm::Window> Platform::create_window(
     return nullptr;
   }
 
+  // Force video init again after sdl has closed
+  if (config_.rootless && video_has_been_closed_) {
+    DEBUG("forcing video init");
+    SDL_VideoInit(NULL);
+    video_has_been_closed_ = false;
+  }
+
   auto id = next_window_id();
   auto w = std::make_shared<Window>(renderer_, id, task, shared_from_this(), frame, title,
 		  !window_size_immutable_, !config_.server_side_decoration);
@@ -508,6 +527,4 @@ std::shared_ptr<audio::Source> Platform::create_audio_source() {
 bool Platform::supports_multi_window() const {
   return true;
 }
-} // namespace sdl
-} // namespace platform
-} // namespace anbox
+}
